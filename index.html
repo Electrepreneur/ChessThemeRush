@@ -9,7 +9,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   
-  <!-- jQuery, Chess.js, and Chessboard.js Dependencies -->
+  <!-- jQuery, Chess.js (v0.10.3), and Chessboard.js Dependencies -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
@@ -74,18 +74,16 @@
 
   </main>
 
-  <!-- OPTIONAL BANNER AD ZONE (Clean Container for Ad Scripts) -->
+  <!-- BANNER AD ZONE -->
   <div class="bg-slate-950 border-t border-slate-800 p-3 text-center text-xs text-slate-500">
-    <!-- Paste banner network script or affiliate link here -->
     <span>[ Ad Zone: 728x90 Footer Banner / Sponsor Link ]</span>
   </div>
 
   <script>
-    // Embedded sample puzzle bank categorized by theme
     const puzzleDatabase = {
       pins: [
         { fen: "r1bqk2r/pppp1ppp/2n5/4p3/1bB1n3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 0 7", moves: ["c4f7", "e8f7", "f3e5", "c6e5"] },
-        { fen: "r1bqkbnr/pppp1ppp/8/4p3/2BnP3/5N2/PPPP1PPP/RNBQK2R b KQkq - 1 4", suffix: "pin", moves: ["d4f3", "d1f3"] }
+        { fen: "r1bqkbnr/pppp1ppp/8/4p3/2BnP3/5N2/PPPP1PPP/RNBQK2R b KQkq - 1 4", moves: ["d4f3", "d1f3"] }
       ],
       forks: [
         { fen: "r1bqk1nr/pppp1ppp/2n5/2b1p3/4P3/3P1N2/PPP2PPP/RNBQKB1R w KQkq - 1 4", moves: ["f3g5", "g8h6", "g5f7"] }
@@ -111,8 +109,6 @@
     function startRush() {
       const selectedTheme = document.getElementById('theme-select').value;
       currentPuzzleList = puzzleDatabase[selectedTheme] || puzzleDatabase.pins;
-      
-      // Shuffle puzzle list
       currentPuzzleList.sort(() => Math.random() - 0.5);
       
       currentIndex = 0;
@@ -129,6 +125,7 @@
       initBoard();
       loadNextPuzzle();
 
+      if (timerInterval) clearInterval(timerInterval);
       timerInterval = setInterval(() => {
         timeLeft--;
         document.getElementById('timer').innerText = timeLeft;
@@ -140,17 +137,21 @@
     }
 
     function initBoard() {
-      if (board) return;
+      if (board) {
+        board.resize();
+        return;
+      }
       board = Chessboard('board', {
         draggable: true,
         position: 'start',
+        pieceTheme: 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/wikipedia/{piece}.png',
         onDrop: handleMove
       });
     }
 
     function loadNextPuzzle() {
       if (currentIndex >= currentPuzzleList.length) {
-        currentIndex = 0; // Loop puzzle bank if exhausted
+        currentIndex = 0;
         currentPuzzleList.sort(() => Math.random() - 0.5);
       }
 
@@ -160,8 +161,6 @@
       expectedMoveSequence = [...puzzle.moves];
       moveStep = 0;
 
-      // Automatically execute opponent's setup move if present
-      // For simplicity in this demo, user immediately plays the first expected move
       document.getElementById('feedback').innerText = "";
     }
 
@@ -169,31 +168,25 @@
       const moveObj = { from: source, to: target, promotion: 'q' };
       const move = game.move(moveObj);
 
-      if (move === null) return 'snapback'; // illegal move
+      if (move === null) return 'snapback'; // Illegal move in chess rules
 
-      // Format move in UCI-like string (e.g. 'e2e4') to match database array
       const playedMoveStr = source + target;
       const expectedMove = expectedMoveSequence[moveStep];
 
-      if (playedMoveStr === expectedMove || (move.from + move.to) === expectedMove) {
+      if (playedMoveStr === expectedMove) {
         moveStep++;
         if (moveStep >= expectedMoveSequence.length) {
-          // Puzzle Solved!
           score += 100;
           document.getElementById('score').innerText = score;
-          document.getElementById('feedback').innerHTML = '<span class="text-emerald-400">Correct! +100</span>';
+          document.getElementById('feedback').innerHTML = '<span class="text-emerald-400 font-semibold">Correct! +100</span>';
           currentIndex++;
-          setTimeout(loadNextPuzzle, 600);
+          setTimeout(loadNextPuzzle, 700);
         } else {
-          // Play automated opponent reply if needed in multi-step puzzles
-          window.setTimeout(() => {
-            // Auto advance next step if multi-move
-          }, 250);
+          document.getElementById('feedback').innerHTML = '<span class="text-sky-400">Good move, keep going!</span>';
         }
       } else {
-        // Wrong move
         game.undo();
-        document.getElementById('feedback').innerHTML = '<span class="text-rose-400">Incorrect, try again!</span>';
+        document.getElementById('feedback').innerHTML = '<span class="text-rose-400 font-semibold">Incorrect, try again!</span>';
         return 'snapback';
       }
     }
