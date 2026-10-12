@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Theme Rush - Chess Tactical Trainer</title>
+  
+  <!-- Tailwind CSS & Google Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <!-- jQuery, Chess.js, and Chessboard.js Dependencies -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+    .board-container { width: 400px; max-width: 100%; margin: 0 auto; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+  <!-- HEADER -->
+  <header class="bg-slate-800 border-b border-slate-700 py-4 px-6 flex justify-between items-center">
+    <h1 class="text-xl font-bold text-sky-400">⚡ Theme Rush</h1>
+    <div id="stats" class="flex gap-6 text-sm font-semibold">
+      <div>Score: <span id="score" class="text-emerald-400">0</span></div>
+      <div>Time Left: <span id="timer" class="text-amber-400">60</span>s</div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 flex flex-col items-center justify-center p-4">
+    
+    <!-- SETUP SCREEN -->
+    <div id="setup-screen" class="bg-slate-800 p-8 rounded-xl border border-slate-700 text-center max-w-md w-full shadow-2xl">
+      <h2 class="text-2xl font-bold mb-4">Select Tactical Theme</h2>
+      <p class="text-slate-400 text-sm mb-6">Drill specific tactical motifs under a timer instead of random puzzles.</p>
+      
+      <select id="theme-select" class="w-full bg-slate-900 border border-slate-700 p-3 rounded-lg text-white mb-6 focus:outline-none focus:border-sky-400">
+        <option value="pins">Pins & Pinning Tactics</option>
+        <option value="forks">Forks & Double Attacks</option>
+        <option value="backRank">Back Rank Mates</option>
+        <option value="sicilian">Sicilian Defense Tactics</option>
+      </select>
+
+      <button onclick="startRush()" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold py-3 rounded-lg transition">
+        Start Rush Game
+      </button>
+    </div>
+
+    <!-- GAMEPLAY INTERFACE (Hidden initially) -->
+    <div id="game-screen" class="hidden flex flex-col items-center w-full max-w-md">
+      <div id="puzzle-instructions" class="text-sm text-sky-300 font-semibold mb-3 text-center">Find the best move!</div>
+      
+      <!-- Chessboard Element -->
+      <div class="board-container bg-slate-800 p-2 rounded-lg border border-slate-700 shadow-xl">
+        <div id="board" style="width: 360px"></div>
+      </div>
+
+      <div id="feedback" class="mt-4 text-sm font-medium h-6"></div>
+    </div>
+
+    <!-- GAME OVER SCREEN -->
+    <div id="gameover-screen" class="hidden bg-slate-800 p-8 rounded-xl border border-slate-700 text-center max-w-md w-full shadow-2xl">
+      <h2 class="text-2xl font-bold mb-2">Time's Up!</h2>
+      <p class="text-slate-400 mb-6">Final Score: <span id="final-score" class="text-emerald-400 text-xl font-bold">0</span></p>
+      <button onclick="resetToSetup()" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold py-3 rounded-lg transition">
+        Play Again
+      </button>
+    </div>
+
+  </main>
+
+  <!-- OPTIONAL BANNER AD ZONE (Clean Container for Ad Scripts) -->
+  <div class="bg-slate-950 border-t border-slate-800 p-3 text-center text-xs text-slate-500">
+    <!-- Paste banner network script or affiliate link here -->
+    <span>[ Ad Zone: 728x90 Footer Banner / Sponsor Link ]</span>
+  </div>
+
+  <script>
+    // Embedded sample puzzle bank categorized by theme
+    const puzzleDatabase = {
+      pins: [
+        { fen: "r1bqk2r/pppp1ppp/2n5/4p3/1bB1n3/3P1N2/PPP2PPP/RNBQK2R w KQkq - 0 7", moves: ["c4f7", "e8f7", "f3e5", "c6e5"] },
+        { fen: "r1bqkbnr/pppp1ppp/8/4p3/2BnP3/5N2/PPPP1PPP/RNBQK2R b KQkq - 1 4", suffix: "pin", moves: ["d4f3", "d1f3"] }
+      ],
+      forks: [
+        { fen: "r1bqk1nr/pppp1ppp/2n5/2b1p3/4P3/3P1N2/PPP2PPP/RNBQKB1R w KQkq - 1 4", moves: ["f3g5", "g8h6", "g5f7"] }
+      ],
+      backRank: [
+        { fen: "3r2k1/5ppp/8/8/8/8/4QPPP/6K1 w - - 0 1", moves: ["e2e8", "d8e8"] }
+      ],
+      sicilian: [
+        { fen: "r1bqkbnr/pp1ppppp/n7/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2", moves: ["g8f6", "e4e5", "f6d5"] }
+      ]
+    };
+
+    let game = null;
+    let board = null;
+    let currentPuzzleList = [];
+    let currentIndex = 0;
+    let score = 0;
+    let timeLeft = 60;
+    let timerInterval = null;
+    let expectedMoveSequence = [];
+    let moveStep = 0;
+
+    function startRush() {
+      const selectedTheme = document.getElementById('theme-select').value;
+      currentPuzzleList = puzzleDatabase[selectedTheme] || puzzleDatabase.pins;
+      
+      // Shuffle puzzle list
+      currentPuzzleList.sort(() => Math.random() - 0.5);
+      
+      currentIndex = 0;
+      score = 0;
+      timeLeft = 60;
+      
+      document.getElementById('score').innerText = score;
+      document.getElementById('timer').innerText = timeLeft;
+      
+      document.getElementById('setup-screen').classList.add('hidden');
+      document.getElementById('gameover-screen').classList.add('hidden');
+      document.getElementById('game-screen').classList.remove('hidden');
+
+      initBoard();
+      loadNextPuzzle();
+
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        document.getElementById('timer').innerText = timeLeft;
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          endGame();
+        }
+      }, 1000);
+    }
+
+    function initBoard() {
+      if (board) return;
+      board = Chessboard('board', {
+        draggable: true,
+        position: 'start',
+        onDrop: handleMove
+      });
+    }
+
+    function loadNextPuzzle() {
+      if (currentIndex >= currentPuzzleList.length) {
+        currentIndex = 0; // Loop puzzle bank if exhausted
+        currentPuzzleList.sort(() => Math.random() - 0.5);
+      }
+
+      const puzzle = currentPuzzleList[currentIndex];
+      game = new Chess(puzzle.fen);
+      board.position(puzzle.fen);
+      expectedMoveSequence = [...puzzle.moves];
+      moveStep = 0;
+
+      // Automatically execute opponent's setup move if present
+      // For simplicity in this demo, user immediately plays the first expected move
+      document.getElementById('feedback').innerText = "";
+    }
+
+    function handleMove(source, target) {
+      const moveObj = { from: source, to: target, promotion: 'q' };
+      const move = game.move(moveObj);
+
+      if (move === null) return 'snapback'; // illegal move
+
+      // Format move in UCI-like string (e.g. 'e2e4') to match database array
+      const playedMoveStr = source + target;
+      const expectedMove = expectedMoveSequence[moveStep];
+
+      if (playedMoveStr === expectedMove || (move.from + move.to) === expectedMove) {
+        moveStep++;
+        if (moveStep >= expectedMoveSequence.length) {
+          // Puzzle Solved!
+          score += 100;
+          document.getElementById('score').innerText = score;
+          document.getElementById('feedback').innerHTML = '<span class="text-emerald-400">Correct! +100</span>';
+          currentIndex++;
+          setTimeout(loadNextPuzzle, 600);
+        } else {
+          // Play automated opponent reply if needed in multi-step puzzles
+          window.setTimeout(() => {
+            // Auto advance next step if multi-move
+          }, 250);
+        }
+      } else {
+        // Wrong move
+        game.undo();
+        document.getElementById('feedback').innerHTML = '<span class="text-rose-400">Incorrect, try again!</span>';
+        return 'snapback';
+      }
+    }
+
+    function endGame() {
+      document.getElementById('game-screen').classList.add('hidden');
+      document.getElementById('gameover-screen').classList.remove('hidden');
+      document.getElementById('final-score').innerText = score;
+    }
+
+    function resetToSetup() {
+      document.getElementById('gameover-screen').classList.add('hidden');
+      document.getElementById('setup-screen').classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>
